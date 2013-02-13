@@ -1,0 +1,44 @@
+digraph ginza_servers {
+  graph [rankdir=LR,concentrate=false,ranksep=1,nodesep=0.125];
+  node [shape=box,fontname="DejaVu Sans",fontsize=12];
+  fontname="DejaVu Sans";
+  fontsize=10;
+  labeljust=l;
+
+<% environments.each do |env| -%>
+<%   if env.name == '_default' -%>
+  subgraph no_cluster_<%= env %> {
+<%   else -%>
+  subgraph cluster_<%= env %> {
+    label="environment[<%= env %>]";
+<%   end -%>
+    node[shape=box3d];
+    // rank=source;
+<%   nodes[ lambda { |n| n.chef_environment == env.name } ].each do |node| -%>
+    <%= node.graphviz_id %> [label="<%= node %>\n<%= node['fqdn'] %>\n<%= (node['cloud'] && node['cloud']['public_ipv4']) || node['ipaddress'] %>"<% if node['virtualization'] && node['virtualization']['role'] == 'guest' %>,color=yellow4<% end %>];
+<%   end -%>
+  }
+<% end -%>
+
+  node[shape=folder,color=green];
+<% roles.each do |role| -%>
+  <%= role.graphviz_id %> [label="<%= role %>\n<%= role.description %>"<% if role.name =~ /^_/ %>,color=grey<% end %>];
+<% end -%>
+
+  node[shape=box,color=orange];
+<% ( roles.map(&:run_list).map(&:recipes) + nodes.map { |n| n.run_list.expand(n.chef_environment).recipes } ).flatten.uniq.each do |recipe| -%>
+  <%= recipe.graphviz_id %> [label="recipe[<%= recipe %>]"];
+<% end -%>
+
+<% [ roles, nodes ].each do |thingies| -%>
+
+<%   thingies.each do |thingy| -%>
+<%     roles[ thingy.run_list.roles ].each do |role| -%>
+  <%= thingy.graphviz_id %> -> <%= role.graphviz_id %> [color=<%= role.name =~ /^_/ ? 'grey' : 'green' %>];
+<%     end -%>
+<%     thingy.run_list.recipes.each do |recipe| -%>
+  <%= thingy.graphviz_id %> -> <%= recipe.graphviz_id %> [color=orange];
+<%     end -%>
+<%   end -%>
+<% end -%>
+}
